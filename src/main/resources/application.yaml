@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: TransportSchedule
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    url: jdbc:postgresql://localhost:5432/station_db
+  jpa:
+    hibernate:
+      ddl-auto: update
