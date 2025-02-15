@@ -7,9 +7,26 @@ spring:
     username: postgres
     password: postgres
     url: jdbc:postgresql://localhost:5432/station_db
+
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true  # Форматирование SQL-запросов для читаемости
+        show_sql: true  # Вывод SQL-запросов в лог
+        use_sql_comments: true  # Добавляет комментарии Hibernate в логи
+
+logging:
+  level:
+    root: info
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.example.transportschedule: DEBUG
+  file:
+    name: logs/application.log
+
 
 springdoc:
   swagger-ui:
