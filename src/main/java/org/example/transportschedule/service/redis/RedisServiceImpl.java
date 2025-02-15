@@ -50,17 +50,20 @@ public class RedisServiceImpl implements RedisService {
         return objectMapper.convertValue(obj, clazz);
     }
 
-    public <T> List<T> getListFromRedis(String key, Class<T> clazz) {
-        // Получаем данные из Redis
-        Object obj = redisTemplate.opsForValue().get(key);
-
-        // Если данные не найдены, возвращаем пустой список
-        if (obj == null) {
+    public <T> List<T> getAll(String key, Class<T> clazz) {
+        Set<String> keys = redisTemplate.keys(key + "*");
+        if (keys == null || keys.isEmpty()) {
             return Collections.emptyList();
         }
 
+        List<Object> objects = redisTemplate.opsForValue().multiGet(keys);
+        if (objects == null) {
+            return Collections.emptyList();
+        }
 
-        // Преобразуем объект в нужный тип (список)
-        return objectMapper.convertValue(obj, objectMapper.getTypeFactory().constructCollectionType(List.class, clazz));
+        return objects.stream()
+                .filter(clazz::isInstance)
+                .map(clazz::cast)
+                .toList();
     }
 }

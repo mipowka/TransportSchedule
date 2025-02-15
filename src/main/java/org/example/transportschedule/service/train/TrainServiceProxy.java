@@ -66,7 +66,7 @@ public class TrainServiceProxy implements TrainService {
         log.info("Запрос всех поездов, страница: {}", pageable);
 
         // Получаем закешированный список TrainDTO
-        List<TrainDTO> cachedList = redisService.getListFromRedis(cacheKey, TrainDTO.class);
+        List<TrainDTO> cachedList = redisService.getAll(cacheKey, TrainDTO.class);
         if (cachedList != null && !cachedList.isEmpty()) {
             log.info("Найдены данные в кеше для страницы: {}", pageable);
             // Здесь totalElements можно сохранить отдельно, если требуется
