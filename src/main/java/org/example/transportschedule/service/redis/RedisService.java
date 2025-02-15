@@ -7,5 +7,5 @@ public interface RedisService {
     void removeFromRedis(String key);
     void clearPageable(String key);
     <T> T getFromRedis(String key, Class<T> clazz);
-    <T> List<T> getListFromRedis(String key, Class<T> clazz);
+    <T> List<T> getAll(String key, Class<T> clazz);
 }

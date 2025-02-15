@@ -4,6 +4,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.transportschedule.model.dto.BusDTO;
 import org.example.transportschedule.service.bus.BusService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,8 +24,8 @@ public class BusController {
     }
 
     @GetMapping
-    public ResponseEntity<List<BusDTO>> getAllBuses(@RequestParam int page) {
-        return ResponseEntity.ok(busService.getAllBuses(page));
+    public ResponseEntity<Page<BusDTO>> getAllBuses(@PageableDefault(sort = "dateOfArrival") Pageable pageable) {
+        return ResponseEntity.ok(busService.getAllBuses(pageable));
     }
 
     @GetMapping("/routes")
@@ -42,7 +45,7 @@ public class BusController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<BusDTO> updateBus(@PathVariable long id,@Valid @RequestBody BusDTO busDTO) {
+    public ResponseEntity<BusDTO> updateBus(@PathVariable long id, @Valid @RequestBody BusDTO busDTO) {
         return ResponseEntity.ok(busService.updateBus(id, busDTO));
     }
 

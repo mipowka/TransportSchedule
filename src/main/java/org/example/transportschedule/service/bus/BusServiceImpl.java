@@ -10,14 +10,12 @@ import org.example.transportschedule.model.entity.Bus;
 import org.example.transportschedule.repository.bus.BusRepository;
 import org.example.transportschedule.service.redis.RedisService;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +38,7 @@ public class BusServiceImpl implements BusService {
 
         // Если данных нет в Redis, загружаем их из базы данных
         BusDTO busFromDb = busMapper.mapToBusDTO(busRepository.findById(id)
-                .orElseThrow(() -> new BusNotFoundException("Bus with id " + id + " not found")));
+                .orElseThrow(() -> new BusNotFoundException(id)));
 
         // Сохраняем результат в Redis для последующего использования
         redisService.addToRedis(Constants.BUS_CACHE_KEY_PREFIX + id, busFromDb, 30L);
@@ -68,7 +66,7 @@ public class BusServiceImpl implements BusService {
     public BusDTO updateBus(long id, BusDTO bus) {
         // Ищем автобус в базе данных по id
         Bus busToUpdate = busRepository.findById(id)
-                .orElseThrow(() -> new BusNotFoundException("Bus with id " + id + " not found"));
+                .orElseThrow(() -> new BusNotFoundException(id));
 
         // Обновляем поля автобуса
         busToUpdate.setCityFrom(bus.cityFrom());
@@ -106,42 +104,25 @@ public class BusServiceImpl implements BusService {
             redisService.clearPageable(Constants.BUSES_CACHE_KEY_PREFIX_WITH_PAGE);
         } else {
             // Если автобус не найден, выбрасываем исключение
-            throw new BusNotFoundException("Bus with id " + id + " not found");
+            throw new BusNotFoundException(id);
         }
     }
 
     @Override
-    public List<BusDTO> getAllBuses(int page) {
-        //если параметр меньше или равен нулю, кидаем ошибку
-        if (page <= 0) {
-            throw new IllegalArgumentException("page must be greater than 0");
-        }
-        // Проверяем наличие данных в Redis для конкретной страницы
-        List<BusDTO> busesFromRedis = redisService
-                .getListFromRedis(Constants.BUSES_CACHE_KEY_PREFIX_WITH_PAGE + page, BusDTO.class);
+    public Page<BusDTO> getAllBuses(Pageable pageable) {
+        String cacheKey = Constants.BUSES_CACHE_KEY_PREFIX_WITH_PAGE + "_" + pageable.getPageNumber()
+                + "_" + pageable.getPageSize();
 
-        // Если данные найдены в Redis, возвращаем их
-        if (busesFromRedis != null && !busesFromRedis.isEmpty()) {
-            return busesFromRedis;
+        List<BusDTO> cachedList = redisService.getAll(cacheKey, BusDTO.class);
+
+        if (cachedList != null && !cachedList.isEmpty()) {
+            return new PageImpl<>(cachedList, pageable, cachedList.size());
         }
 
-        // Если в кэше нет данных, загружаем их из базы данных с пагинацией
-        Pageable pageable = PageRequest
-                .of(page - 1, Constants.PAGE_SIZE);
         Page<Bus> busesFromDb = busRepository.findAll(pageable);
+        redisService.addToRedis(cacheKey, busesFromDb, 30L);
 
-
-        // Маппируем сущности Bus в DTO
-        List<BusDTO> busDTOList = busesFromDb.stream()
-                .sorted(Comparator.comparing(Bus::getDateOfDeparture))
-                .map(busMapper::mapToBusDTO)
-                .collect(Collectors.toList());
-
-        // Сохраняем результат в Redis для дальнейшего использования
-        redisService.addToRedis(Constants.BUSES_CACHE_KEY_PREFIX_WITH_PAGE + page, busDTOList, 30L);
-
-        // Возвращаем список DTO
-        return busDTOList;
+        return busesFromDb.map(busMapper::mapToBusDTO);
     }
 
     @Override
