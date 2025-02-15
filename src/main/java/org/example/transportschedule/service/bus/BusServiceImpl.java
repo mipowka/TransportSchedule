@@ -25,16 +25,29 @@ public class BusServiceImpl implements BusService {
     private final RedisService redisService;
     private final BusMapper busMapper;
 
+    /**
+     * Получение автобуса по id с использованием кеша.
+     * Если автобус не найден в кеше, запрос выполняется к основной базе данных.
+     *
+     * @param id идентификатор автобуса
+     * @return объект BusDTO
+     * @throws BusNotFoundException если автобус с таким id не найден
+     */
     @Override
     public BusDTO getBusById(long id) {
+        log.info("Запрос автобуса с id: {}", id);
+
         // Проверяем наличие данных в Redis
         BusDTO busFromRedis = redisService
                 .getFromRedis(Constants.BUS_CACHE_KEY_PREFIX + id, BusDTO.class);
 
         // Если данные найдены в Redis, возвращаем их
         if (busFromRedis != null) {
+            log.info("Автобус с id: {} найден в кеше", id);
             return busFromRedis;
         }
+
+        log.info("Автобус с id: {} не найден в кеше, обращаемся к БД", id);
 
         // Если данных нет в Redis, загружаем их из базы данных
         BusDTO busFromDb = busMapper.mapToBusDTO(busRepository.findById(id)
@@ -47,11 +60,19 @@ public class BusServiceImpl implements BusService {
         return busFromDb;
     }
 
+    /**
+     * Добавление нового автобуса в систему.
+     * После добавления очищается кеш с данными о всех автобусах, так как список изменился.
+     *
+     * @param bus объект автобуса, который нужно добавить
+     * @return добавленный объект BusDTO
+     */
     @Transactional
     @Override
     public BusDTO addBus(BusDTO bus) {
+        log.info("Добавление нового автобуса: {}", bus);
+
         // Сохраняем автобус в базу данных
-        log.info(busMapper.mapToBusEntity(bus).toString());
         busRepository.save(busMapper.mapToBusEntity(bus));
 
         // Очищаем кэш с данными о всех автобусах, так как добавление нового автобуса меняет список
@@ -61,9 +82,20 @@ public class BusServiceImpl implements BusService {
         return bus;
     }
 
+    /**
+     * Обновление информации об автобусе с указанным id.
+     * После обновления очищается кеш для данного автобуса и кеш с данными о всех автобусах.
+     *
+     * @param id идентификатор автобуса, который нужно обновить
+     * @param bus новые данные для автобуса
+     * @return обновленный объект BusDTO
+     * @throws BusNotFoundException если автобус с таким id не найден
+     */
     @Transactional
     @Override
     public BusDTO updateBus(long id, BusDTO bus) {
+        log.info("Обновление автобуса с id: {} данными: {}", id, bus);
+
         // Ищем автобус в базе данных по id
         Bus busToUpdate = busRepository.findById(id)
                 .orElseThrow(() -> new BusNotFoundException(id));
@@ -90,9 +122,18 @@ public class BusServiceImpl implements BusService {
         return savedBus;
     }
 
+    /**
+     * Удаление автобуса по id.
+     * После удаления очищается кеш для данного автобуса и кеш с данными о всех автобусах.
+     *
+     * @param id идентификатор автобуса, который нужно удалить
+     * @throws BusNotFoundException если автобус с таким id не найден
+     */
     @Transactional
     @Override
     public void deleteBus(long id) {
+        log.info("Удаление автобуса с id: {}", id);
+
         // Проверяем, существует ли автобус с данным id в базе данных
         if (busRepository.existsById(id)) {
             // Удаляем автобус из базы данных
@@ -108,29 +149,56 @@ public class BusServiceImpl implements BusService {
         }
     }
 
+    /**
+     * Получение всех автобусов с постраничной разбивкой.
+     * Если данные найдены в кеше, они возвращаются из него, иначе запрос выполняется к базе данных.
+     *
+     * @param pageable параметры пагинации
+     * @return страница объектов BusDTO
+     */
     @Override
     public Page<BusDTO> getAllBuses(Pageable pageable) {
+        log.info("Запрос всех автобусов, страница: {}", pageable);
+
+        // Формируем ключ для кеша на основе номера страницы и размера
         String cacheKey = Constants.BUSES_CACHE_KEY_PREFIX_WITH_PAGE + "_" + pageable.getPageNumber()
                 + "_" + pageable.getPageSize();
 
+        // Получаем закешированный список BusDTO
         List<BusDTO> cachedList = redisService.getAll(cacheKey, BusDTO.class);
 
+        // Если данные найдены в кеше, возвращаем их
         if (cachedList != null && !cachedList.isEmpty()) {
+            log.info("Найдены данные в кеше для страницы: {}", pageable);
             return new PageImpl<>(cachedList, pageable, cachedList.size());
         }
 
+        log.info("Данных в кеше для страницы: {} нет, обращаемся к БД", pageable);
+
+        // Если данных нет в кеше, загружаем их из базы данных
         Page<Bus> busesFromDb = busRepository.findAll(pageable);
+
+        // Сохраняем результат в Redis для последующего использования
         redisService.addToRedis(cacheKey, busesFromDb, 30L);
 
+        // Возвращаем страницу с объектами BusDTO
         return busesFromDb.map(busMapper::mapToBusDTO);
     }
 
+    /**
+     * Получение всех маршрутов из указанного города.
+     * Формирует список маршрутов в формате "город отправления - город назначения".
+     *
+     * @param city город отправления
+     * @return список маршрутов в виде строк
+     */
     @Override
     public List<String> getRouteFromCity(String city) {
+        log.info("Запрос маршрутов автобусов из города: {}", city);
+
         // Получаем все маршруты для указанного города отправления
         return busRepository.findAllByCityFrom(city).stream()
                 .map(bus -> bus.getCityFrom() + " - " + bus.getCityTo())
                 .toList();
     }
 }
-

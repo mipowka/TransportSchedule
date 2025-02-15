@@ -1,12 +1,19 @@
 spring:
+
   application:
     name: TransportSchedule
 
   datasource:
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: postgres
-    url: jdbc:postgresql://localhost:5432/station_db
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL}
+
+  data:
+    redis:
+      port: 6379
+      host: redis
+
 
   jpa:
     hibernate:
