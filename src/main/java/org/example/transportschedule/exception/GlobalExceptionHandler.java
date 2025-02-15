@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DateTimeParseException.class)
-    public ResponseEntity<Map<String, String>> handleDateTimeParseException(DateTimeParseException ex) {
+    public ResponseEntity<Map<String, String>> handleDateTimeParseException() {
         return ResponseEntity.badRequest().body(Map.of("error", "Неверный формат даты. Используйте формат 'dd.MM.yyyy HH:mm'"));
     }
 }
